@@ -11,17 +11,21 @@ namespace DataGroup
     class operation_excel_data
     {
     public:
-        operation_excel_data(const std::string & input_path, const std::string & input_name);
+        operation_excel_data(const std::string & input_path);
         ~operation_excel_data();
 
         // 读取excel中的数据
         void read();
         // 将数据写回excel
         void write();
+        // 最外层表示的是sheet
         // 总表文档的内容，第一层是列，第二层是行，包含数据表的标题行
         // 数据为公共的，可以直接修改
         // 注意，为了性能不检查cell_data的形状，它必须是方形，向其中填充数据时需要注意
-        std::vector<std::vector<std::string>> cell_data;
+        std::vector<std::vector<std::string>> sheet_cell_1;
+        std::vector<std::vector<std::string>> sheet_cell_2;
+        std::vector<std::vector<std::string>> sheet_cell_3;
+        std::vector<std::vector<std::string>> sheet_cell_4;
 
     private:
         // excel文档类
@@ -30,8 +34,6 @@ namespace DataGroup
         QAxObject* work_books;
         // 文档对应的路径
         std::string file_path;
-        // 文档对应的sheet名字
-        std::string name;
     };
 }
 #endif // EXCEL_DATA_H

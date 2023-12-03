@@ -8,28 +8,28 @@ void DataGroup::operation_graph::run()
         sheet_1 = std::make_shared<operation_excel_data>(file_path, "总表");
         sheet_2 = std::make_shared<operation_excel_data>(file_path, "连接器清单");
         sheet_3 = std::make_shared<operation_excel_data>(file_path, "线图");
-        // sheet_4 = std::make_shared<operation_excel_data>(file_path, "问题清单");
+        sheet_4 = std::make_shared<operation_excel_data>(file_path, "问题清单");
         emit send_str(std::string("正在读取文件..."));
         sheet_1->read();
         sheet_2->read();
         sheet_3->read();
-        // sheet_4->read();
+        sheet_4->read();
         emit send_str(std::string("读取成功，正在生成线图..."));
         fill_edge_data();
         fill_filter_data();
         filter_edge();
-        make_nodes();
-        emit send_str(std::string("生成完成，正在将结果写入excel表中..."));
         // 目前程序到这里是没有问题的
         qDebug() << "--编辑部分已完成--";
+        make_nodes();
+        emit send_str(std::string("生成完成，正在将结果写入excel表中..."));
         write_graph();
         sheet_3->write();
-        // sheet_4->write();
+        sheet_4->write();
         emit send_str(std::string("写入完成，结果已存入excel表，正在关闭..."));
         sheet_1.reset();
         sheet_2.reset();
         sheet_3.reset();
-        // sheet_4.reset();
+        sheet_4.reset();
         emit send_str(std::string("已关闭，可重新选择文件检查"));
         run_label = false;
     }
@@ -56,7 +56,7 @@ void DataGroup::operation_graph::fill_edge_data()
         }
         else
         {
-            Eedge temp_edge;
+            wire temp_edge;
             // 填充对应的连接器
             temp_edge.wire_number = ch[title_reflection[0]];
             temp_edge.harness_number = ch[title_reflection[1]];
@@ -67,19 +67,19 @@ void DataGroup::operation_graph::fill_edge_data()
             temp_edge.color = ch[title_reflection[6]];
             temp_edge.wire_length = ch[title_reflection[7]];
             // 填充对应的端点
-            temp_edge.first.position_num = ch[title_reflection[8]] != "" ? std::stod(ch[title_reflection[8]]) : -1;
-            temp_edge.first.explain = ch[title_reflection[9]];
-            temp_edge.first.junction = ch[title_reflection[10]];
+            temp_edge.start.position_num = ch[title_reflection[8]] != "" ? std::stod(ch[title_reflection[8]]) : -1;
+            temp_edge.start.explain = ch[title_reflection[9]];
+            temp_edge.start.junction = ch[title_reflection[10]];
             auto temp_left = part_str(ch[title_reflection[11]]);
-            temp_edge.first.dot_num = temp_left.first.empty() ? -1 : temp_left.first[0];
-            temp_edge.first.dot_char = temp_left.second;
+            temp_edge.start.dot_num = temp_left.first.empty() ? -1 : temp_left.first[0];
+            temp_edge.start.dot_char = temp_left.second;
 
-            temp_edge.second.position_num = ch[title_reflection[12]] != "" ? std::stod(ch[title_reflection[12]]) : -1;
-            temp_edge.second.explain = ch[title_reflection[13]];
-            temp_edge.second.junction = ch[title_reflection[14]];
+            temp_edge.end.position_num = ch[title_reflection[12]] != "" ? std::stod(ch[title_reflection[12]]) : -1;
+            temp_edge.end.explain = ch[title_reflection[13]];
+            temp_edge.end.junction = ch[title_reflection[14]];
             auto temp_right = part_str(ch[title_reflection[15]]);
-            temp_edge.second.dot_num = temp_right.first.empty() ? -1 : temp_right.first[0];
-            temp_edge.second.dot_char = temp_right.second;
+            temp_edge.end.dot_num = temp_right.first.empty() ? -1 : temp_right.first[0];
+            temp_edge.end.dot_char = temp_right.second;
 
             total_edges.emplace_back(temp_edge);
         }
@@ -142,12 +142,12 @@ void DataGroup::operation_graph::fill_filter_data()
 
 void DataGroup::operation_graph::filter_edge()
 {
-    std::vector<Eedge> final_total_edges;
+    std::vector<wire> final_total_edges;
     int count = 0;
     for (const auto & ch : total_edges)
     {
-        connect_type temp_0 = std::make_pair(ch.first.position_num, ch.first.junction);
-        connect_type temp_1 = std::make_pair(ch.second.position_num, ch.second.junction);
+        connect_type temp_0 = std::make_pair(ch.start.position_num, ch.start.junction);
+        connect_type temp_1 = std::make_pair(ch.end.position_num, ch.end.junction);
         // 如果线中有一个端点是需要检查的连接器，保存下来
         if((std::find(filter[0].begin(), filter[0].end(), temp_0) != filter[0].end()) ||
            (std::find(filter[1].begin(), filter[1].end(), temp_0) != filter[1].end()))
@@ -155,6 +155,8 @@ void DataGroup::operation_graph::filter_edge()
             final_total_edges.emplace_back(ch);
             count++;
         }
+        // 如果这根线的起始点不属于连接器或者端子排，但是结束点位属于连接器或者端子排
+        // 这意味着该线是图的一个端点，生成图从这些线开始
         else if((std::find(filter[0].begin(), filter[0].end(), temp_1) != filter[0].end()) ||
                 (std::find(filter[1].begin(), filter[1].end(), temp_1) != filter[1].end()))
         {
@@ -175,36 +177,78 @@ void DataGroup::operation_graph::make_nodes()
     // qDebug() << total_edges[66].second.junction;
     // qDebug() << total_edges[66].second.dot_char;
     // qDebug() << total_edges[66].second.dot_num;
-    // 在这里检查数据的错误
-    for(const auto & ch : total_edges_head_index)
+
+    for(const auto & index : total_edges_head_index)
     {
-        ETreeNode temp;
-        temp.edges_index = ch;
-        temp.link = find_next_node(temp);
-        qDebug() << "--------------";
-        map_list.emplace_back(temp);
+        node head;
+        head.index = index;
+        find_near_node(head);
+        total_nodes.emplace_back(head);
     }
+
+    qDebug() << total_nodes.size();
+    qDebug() << total_edges.size();
 }
 
-std::vector<DataGroup::ETreeNode> DataGroup::operation_graph::find_next_node(const ETreeNode & input_line)
+void DataGroup::operation_graph::find_near_node(node & input_node)
 {
-    std::vector<ETreeNode> link_request;
-    const auto & ch_request = total_edges[input_line.edges_index];
-    for (int var = 0; var < total_edges.size(); ++var)
+    const auto & ch_input = total_edges[input_node.index];
+    for(int var = 0; var < total_edges.size(); var++)
     {
-        auto ch = total_edges[var];
-        if(ch.first.position_num == ch_request.second.position_num &&
-            ch.first.junction == ch_request.second.junction &&
-            ch.first.dot_num == ch_request.second.dot_num)
+        const auto & ch = total_edges[var];
+        // 匹配对应指向的连接器
+        if(ch_input.end.position_num == ch.start.position_num &&
+            ch_input.end.junction == ch.start.junction &&
+            ch_input.end.dot_num == ch.start.dot_num)
         {
-            qDebug() << var;
-            ETreeNode temp;
-            temp.edges_index = var;
-            temp.link = find_next_node(temp);
-            link_request.emplace_back(temp);
+            // 遍历已存在的node，看看是否已创建完成
+            bool is_find = false;
+            for(const auto & ch_ : total_nodes)
+            {
+                if(ch_.index == var)
+                {
+                    input_node.next.emplace_back(std::make_shared<node>(ch_));
+                    is_find = true;
+                    break;
+                }
+            }
+            if(!is_find)
+            {
+                // 如果没查到创建指针
+                node point;
+                point.index = var;
+                total_nodes.emplace_back(point);
+                find_near_node(point);
+                input_node.next.emplace_back(std::make_shared<node>(point));
+            }
+        }
+        // 匹配指向输入的连接器
+        if(ch_input.start.position_num == ch.end.position_num &&
+            ch_input.start.junction == ch.end.junction &&
+            ch_input.start.dot_num == ch.end.dot_num)
+        {
+            // 遍历已存在的node，看看是否已创建完成
+            bool is_find = false;
+            for(const auto & ch_ : total_nodes)
+            {
+                if(ch_.index == var)
+                {
+                    input_node.last.emplace_back(std::make_shared<node>(ch_));
+                    is_find = true;
+                    break;
+                }
+            }
+            if(!is_find)
+            {
+                // 如果没查到创建指针
+                node point;
+                point.index = var;
+                total_nodes.emplace_back(point);
+                find_near_node(point);
+                input_node.last.emplace_back(std::make_shared<node>(point));
+            }
         }
     }
-    return link_request;
 }
 
 void DataGroup::operation_graph::write_graph()
@@ -217,30 +261,30 @@ void DataGroup::operation_graph::write_graph()
         ch.resize(3);
     }
 
-    auto ch_edge = total_edges[map_list[0].edges_index];
+    auto ch_edge = total_edges[total_nodes[0].index];
 
-    qDebug() << ch_edge.first.position_num;
-    qDebug() << ch_edge.first.explain;
-    qDebug() << ch_edge.first.junction;
-    qDebug() << ch_edge.first.dot_char;
-    qDebug() << ch_edge.first.dot_num;
-    qDebug() << "";
-    qDebug() << ch_edge.second.position_num;
-    qDebug() << ch_edge.second.explain;
-    qDebug() << ch_edge.second.junction;
-    qDebug() << ch_edge.second.dot_char;
-    qDebug() << ch_edge.second.dot_num;
+    // qDebug() << ch_edge.first.position_num;
+    // qDebug() << ch_edge.first.explain;
+    // qDebug() << ch_edge.first.junction;
+    // qDebug() << ch_edge.first.dot_char;
+    // qDebug() << ch_edge.first.dot_num;
+    // qDebug() << "";
+    // qDebug() << ch_edge.second.position_num;
+    // qDebug() << ch_edge.second.explain;
+    // qDebug() << ch_edge.second.junction;
+    // qDebug() << ch_edge.second.dot_char;
+    // qDebug() << ch_edge.second.dot_num;
 
 
-    sheet_3->cell_data[0][0] = std::to_string(ch_edge.first.position_num);
-    sheet_3->cell_data[1][0] = ch_edge.first.explain;
-    sheet_3->cell_data[2][0] = ch_edge.first.junction;
-    sheet_3->cell_data[3][0] = std::to_string(ch_edge.first.dot_num) + ch_edge.first.dot_char;
+    sheet_3->cell_data[0][0] = std::to_string(ch_edge.start.position_num);
+    sheet_3->cell_data[1][0] = ch_edge.start.explain;
+    sheet_3->cell_data[2][0] = ch_edge.start.junction;
+    sheet_3->cell_data[3][0] = std::to_string(ch_edge.start.dot_num) + ch_edge.start.dot_char;
     sheet_3->cell_data[3][1] = ch_edge.wire_number;
-    sheet_3->cell_data[0][2] = std::to_string(ch_edge.second.position_num);
-    sheet_3->cell_data[1][2] = ch_edge.second.explain;
-    sheet_3->cell_data[2][2] = ch_edge.second.junction;
-    sheet_3->cell_data[3][2] = std::to_string(ch_edge.second.dot_num) + ch_edge.second.dot_char;
+    sheet_3->cell_data[0][2] = std::to_string(ch_edge.end.position_num);
+    sheet_3->cell_data[1][2] = ch_edge.end.explain;
+    sheet_3->cell_data[2][2] = ch_edge.end.junction;
+    sheet_3->cell_data[3][2] = std::to_string(ch_edge.end.dot_num) + ch_edge.end.dot_char;
 
 
 

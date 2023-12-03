@@ -13,8 +13,8 @@
 
 namespace DataGroup
 {
-    // 边对应的端点的描述
-    struct Eendpoint
+    // 线对应的端点
+    struct endpoint
     {
         // 位置号
         double position_num;
@@ -27,9 +27,8 @@ namespace DataGroup
         // 点位数字
         int dot_num;
     };
-
-    // 生成线图的边，指一条线
-    struct Eedge
+    // 总表中的线
+    struct wire
     {
         // 线号
         std::string wire_number;
@@ -48,20 +47,26 @@ namespace DataGroup
         // 线长
         std::string wire_length;
         // 线对应的两个顶点,第一个是起始点位，第二个是结束点位
-        Eendpoint first;
-        Eendpoint second;
+        endpoint start;
+        endpoint end;
     };
-
-    // 本质上原理图可以用数据结构上的图来表示
-    // 但是对于当前只检查连接器和端子排的情况，原理图退化为多个不相连的不同的树
-    // 其中树的节点是一根线，而不用连接器表示
-    struct ETreeNode
+    // 线图的节点
+    struct node
     {
-        // 对应的线在总表中的索引
-        // 注意，头节点不存储实际数据，对应的索引为-1
-        size_t edges_index = -1;
-        // 该树节点的子节点
-        std::vector<ETreeNode> link;
+        // 记录该节点对应的线在线总表中的索引
+        size_t index = -1;
+        // 记录该节点指向的节点的指针
+        std::vector<std::shared_ptr<node>> next;
+        // 记录指向该节点的节点的指针
+        std::vector<std::shared_ptr<node>> last;
+    };
+    // 对应的线图错误
+    struct error
+    {
+        // 错误明细
+        std::string explain;
+        // 错误对应的线的索引
+        std::vector<size_t> index;
     };
 
     // 处理生成图的逻辑
@@ -103,8 +108,9 @@ namespace DataGroup
         // 清理当前逻辑下的所有缓存数据，恢复到没有读取数据的状态
         void clear();
 
-        // 寻找输入节点对应的所有下一个节点
-        std::vector<ETreeNode> find_next_node(const ETreeNode & input_line);
+
+        // 寻找临近的所有节点，并添加到输入的节点中
+        void find_near_node(node & input_node);
         // 生成标题行每一列都存储了什么的映射
         static std::array<int, 16> make_title_reflection(const std::vector<std::string> & input_ch);
         // 拆分字符串中的字母和数字
@@ -122,14 +128,15 @@ namespace DataGroup
         // 最终生成问题表的相关数据
         std::shared_ptr<operation_excel_data> sheet_4;
         // excel中所有的线
-        std::vector<Eedge> total_edges;
+        std::vector<wire> total_edges;
         // 对应所有为线图起点的线的索引
         std::vector<size_t> total_edges_head_index;
         // 需求的连接器与端子排的存储, 第一个是连接器，第二个是端子排
+        // 选择数组是为了以后好扩展对应设备的类型
         using connect_type = std::pair<double, std::string>;
         std::array<std::vector<connect_type>,2> filter;
-        // 对应线图的结构树，只存储对应线图的头节点
-        std::vector<ETreeNode> map_list;
+        // 存储所有节点的数组
+        std::vector<node> total_nodes;
     };
 }
 

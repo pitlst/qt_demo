@@ -3,10 +3,9 @@
 
 #include "qvariant.h"
 
-DataGroup::operation_excel_data::operation_excel_data(const std::string & input_path, const std::string & input_name)
+DataGroup::operation_excel_data::operation_excel_data(const std::string & input_path)
 {
     file_path = input_path;
-    name = input_name;
 }
 
 DataGroup::operation_excel_data::operation_excel_data::~operation_excel_data()
@@ -15,7 +14,10 @@ DataGroup::operation_excel_data::operation_excel_data::~operation_excel_data()
     work_books = nullptr;
     excel.dynamicCall("Quit(void)");
     file_path.clear();
-    cell_data.clear();
+    sheet_cell_1.clear();
+    sheet_cell_2.clear();
+    sheet_cell_3.clear();
+    sheet_cell_4.clear();
 }
 
 void DataGroup::operation_excel_data::read()
@@ -35,6 +37,7 @@ void DataGroup::operation_excel_data::read()
     excel.setProperty("Visible", false);
     // 不显示警告
     excel.setProperty("DisplayAlerts", false);
+    excel.setProperty("EnableEvents",false);
     // 读取excel文件
     work_books = excel.querySubObject("WorkBooks");
     work_books->dynamicCall("Open(const QString&)", QString::fromStdString(file_path));
@@ -70,17 +73,43 @@ void DataGroup::operation_excel_data::read()
 
 void DataGroup::operation_excel_data::write()
 {
+    // 对于没有数据的情况应当特殊处理，5*5的表格是一个随机的数字，没有特殊含义
+    int row = cell_data.size();
+    int col;
+    if(row == 0)
+        col = 0;
+    else
+        col = cell_data[0].size();
     // 将std::vector<std::vector<std::string>>转换成QList<QList<QVariant>>
     QList<QList<QVariant>> temp_write;
-    for (const auto & ch : cell_data)
+    if(row == 0)
     {
-        QList<QVariant> temp_list;
-        for (const auto & ch_ : ch)
+        temp_write.resize(1);
+        temp_write[0].resize(1);
+        row = 1;
+        col = 1;
+    }
+    else if(row != 0 && col == 0)
+    {
+        temp_write.resize(row);
+        for(int var = 0; var < row; var++)
         {
-            QVariant temp = QString::fromStdString(ch_);
-            temp_list.append(temp);
+            temp_write[var].resize(1);
         }
-        temp_write.append(temp_list);
+        col = 1;
+    }
+    else
+    {
+        for (const auto & ch : cell_data)
+        {
+            QList<QVariant> temp_list;
+            for (const auto & ch_ : ch)
+            {
+                QVariant temp = QString::fromStdString(ch_);
+                temp_list.append(temp);
+            }
+            temp_write.append(temp_list);
+        }
     }
 
     // 把QList<QList<QVariant> > 转为QVariant
@@ -93,19 +122,21 @@ void DataGroup::operation_excel_data::write()
     }
     res = QVariant(vars);
 
+
     // 写入
     QAxObject * workbook = excel.querySubObject("ActiveWorkBook");
     QAxObject * worksheets = workbook->querySubObject("Sheets");
     QAxObject * sheet = worksheets->querySubObject("Item(QString)", QString::fromStdString(name));
     if (sheet != nullptr && ! sheet->isNull())
     {
-        int row = cell_data.size();
-        int col = cell_data.empty() || cell_data.at(0).empty() ? 0 : cell_data.at(0).size();
         QAxObject * range = sheet->querySubObject("UsedRange");
         range = range->querySubObject("Resize(int,int)", row,col);
         //设置所有单元格为文本属性
         range->setProperty("NumberFormatLocal", "@");
         range->setProperty("Value", res);
+
     }
+    qDebug() << "123";
     workbook->dynamicCall("Save()");
+    qDebug() << "456";
 }
