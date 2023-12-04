@@ -119,14 +119,8 @@ namespace DataGroup
     private:
         // excel文件路径
         std::string file_path;
-        // 总表的相关数据
-        std::shared_ptr<operation_excel_data> sheet_1;
-        // 需求表的相关数据
-        std::shared_ptr<operation_excel_data> sheet_2;
-        // 最终生成线图表的相关数据
-        std::shared_ptr<operation_excel_data> sheet_3;
-        // 最终生成问题表的相关数据
-        std::shared_ptr<operation_excel_data> sheet_4;
+        // excel的相关数据
+        std::shared_ptr<operation_excel_data> data;
         // excel中所有的线
         std::vector<wire> total_edges;
         // 对应所有为线图起点的线的索引

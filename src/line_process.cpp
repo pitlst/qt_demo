@@ -5,15 +5,12 @@ void DataGroup::operation_graph::run()
     if(!run_label)
     {
         run_label = true;
-        sheet_1 = std::make_shared<operation_excel_data>(file_path, "总表");
-        sheet_2 = std::make_shared<operation_excel_data>(file_path, "连接器清单");
-        sheet_3 = std::make_shared<operation_excel_data>(file_path, "线图");
-        sheet_4 = std::make_shared<operation_excel_data>(file_path, "问题清单");
+        data = std::make_shared<operation_excel_data>(file_path);
         emit send_str(std::string("正在读取文件..."));
-        sheet_1->read();
-        sheet_2->read();
-        sheet_3->read();
-        sheet_4->read();
+        data->read("总表");
+        data->read("连接器清单");
+        data->read("线图");
+        data->read("问题清单");
         emit send_str(std::string("读取成功，正在生成线图..."));
         fill_edge_data();
         fill_filter_data();
@@ -23,13 +20,9 @@ void DataGroup::operation_graph::run()
         make_nodes();
         emit send_str(std::string("生成完成，正在将结果写入excel表中..."));
         write_graph();
-        sheet_3->write();
-        sheet_4->write();
+        data->write();
         emit send_str(std::string("写入完成，结果已存入excel表，正在关闭..."));
-        sheet_1.reset();
-        sheet_2.reset();
-        sheet_3.reset();
-        sheet_4.reset();
+        data.reset();
         emit send_str(std::string("已关闭，可重新选择文件检查"));
         run_label = false;
     }
@@ -46,7 +39,7 @@ void DataGroup::operation_graph::fill_edge_data()
     bool first_flag = true;
     std::array<int, 16> title_reflection;
     // 遍历excel的每一行
-    for (const auto & ch : sheet_1->cell_data)
+    for (const auto & ch : data->cell_data["总表"])
     {
         // 如果是第一行
         if(first_flag)
@@ -93,7 +86,7 @@ void DataGroup::operation_graph::fill_filter_data()
     std::vector<int> filter_connect_type;
     // 用于标记遍历的是否为第一列
     bool first_flag = true;
-    for (const auto & ch : sheet_2->cell_data)
+    for (const auto & ch : data->cell_data["连接器清单"])
     {
         // 如果是第一行
         if(first_flag)
@@ -255,8 +248,8 @@ void DataGroup::operation_graph::write_graph()
 {
     // 暂时只是全部画上去，不展示关系
 
-    sheet_3->cell_data.resize(4);
-    for(auto & ch : sheet_3->cell_data)
+    data->cell_data["线图"].resize(4);
+    for(auto & ch : data->cell_data["线图"])
     {
         ch.resize(3);
     }
@@ -276,17 +269,15 @@ void DataGroup::operation_graph::write_graph()
     // qDebug() << ch_edge.second.dot_num;
 
 
-    sheet_3->cell_data[0][0] = std::to_string(ch_edge.start.position_num);
-    sheet_3->cell_data[1][0] = ch_edge.start.explain;
-    sheet_3->cell_data[2][0] = ch_edge.start.junction;
-    sheet_3->cell_data[3][0] = std::to_string(ch_edge.start.dot_num) + ch_edge.start.dot_char;
-    sheet_3->cell_data[3][1] = ch_edge.wire_number;
-    sheet_3->cell_data[0][2] = std::to_string(ch_edge.end.position_num);
-    sheet_3->cell_data[1][2] = ch_edge.end.explain;
-    sheet_3->cell_data[2][2] = ch_edge.end.junction;
-    sheet_3->cell_data[3][2] = std::to_string(ch_edge.end.dot_num) + ch_edge.end.dot_char;
-
-
+    data->cell_data["线图"][0][0] = std::to_string(ch_edge.start.position_num);
+    data->cell_data["线图"][1][0] = ch_edge.start.explain;
+    data->cell_data["线图"][2][0] = ch_edge.start.junction;
+    data->cell_data["线图"][3][0] = std::to_string(ch_edge.start.dot_num) + ch_edge.start.dot_char;
+    data->cell_data["线图"][3][1] = ch_edge.wire_number;
+    data->cell_data["线图"][0][2] = std::to_string(ch_edge.end.position_num);
+    data->cell_data["线图"][1][2] = ch_edge.end.explain;
+    data->cell_data["线图"][2][2] = ch_edge.end.junction;
+    data->cell_data["线图"][3][2] = std::to_string(ch_edge.end.dot_num) + ch_edge.end.dot_char;
 
     // for(const auto & ch : sheet_3->cell_data)
     // {
